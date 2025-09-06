@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+requests
+google-api-python-client
+pytrends
+psycopg2-binary
+SQLAlchemy
+python-dotenv
+pandas
+numpy
