@@ -3,5 +3,5 @@ import os
 
 load_dotenv()
 
-YOUTUBE_DATA_API = os.getenv("YOUTUBE_DATA_API")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
