@@ -13,8 +13,7 @@ def fetch_discourse_workflows(keywords=["workflow", "automation", "google sheets
             search_res = requests.get(search_url)
             search_res.raise_for_status()
             search_data = search_res.json()
-            
-            # --- MODIFICATION HERE: Slice the list to get a max of 10 topics ---
+
             topics = search_data.get('topics', [])[:10] 
             
             print(f"DEBUG: Found {len(search_data.get('topics', []))} topics for keyword '{keyword}'. Processing a max of 10...")

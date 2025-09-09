@@ -32,4 +32,4 @@ def get_workflows(platform: Optional[str] = None, country: Optional[str] = None,
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the n8n Workflow Popularity API. Visit /docs for documentation."}
+    return {"message": "Welcome to the n8n Workflow Popularity API. Visit /docs for documentation. visit /workflows to see workflows."}
