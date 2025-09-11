@@ -1,0 +1,57 @@
+FROM python:3.9-slim
+
+# Install cron and required system packages
+RUN apt-get update && apt-get install -y \
+    cron \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Create cron job setup script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+# Get environment variables\n\
+CRON_SCHEDULE=${CRON_SCHEDULE:-"0 2 * * *"}\n\
+INGESTION_MODE=${INGESTION_MODE:-"full"}\n\
+\n\
+# Create the cron job\n\
+echo "Setting up cron job with schedule: $CRON_SCHEDULE"\n\
+echo "$CRON_SCHEDULE cd /app && python3 scripts/run_cron_ingestion.py --mode=$INGESTION_MODE >> /app/logs/cron.log 2>&1" > /etc/cron.d/popularity-vision\n\
+\n\
+# Set proper permissions\n\
+chmod 0644 /etc/cron.d/popularity-vision\n\
+\n\
+# Apply the cron job\n\
+crontab /etc/cron.d/popularity-vision\n\
+\n\
+# Create initial log file\n\
+touch /app/logs/cron.log\n\
+\n\
+echo "Cron job setup complete. Starting cron daemon..."\n\
+\n\
+# Start cron in foreground\n\
+exec cron -f' > /app/setup_and_run_cron.sh
+
+# Make the setup script executable
+RUN chmod +x /app/setup_and_run_cron.sh
+
+# Make the ingestion script executable
+RUN chmod +x /app/scripts/run_cron_ingestion.py
+
+# Expose volume for logs
+VOLUME ["/app/logs"]
+
+# Run the cron setup and daemon
+CMD ["/app/setup_and_run_cron.sh"]

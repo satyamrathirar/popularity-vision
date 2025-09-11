@@ -1,4 +1,4 @@
-# 🔥 Popularity Vision
+# Popularity Vision
 
 **Multi-Platform Workflow Popularity Analysis System**
 
@@ -90,7 +90,68 @@ Popularity Vision is designed to analyze and track the popularity of n8n automat
    - Documentation: http://localhost:8000/docs
    - Database: localhost:5432
 
+### 🕒 Automated Cron Jobs (Production Setup)
+
+For production environments, set up automated data ingestion using cron jobs:
+
+#### Option 1: Docker-based Cron Service
+```bash
+# Start with cron service included
+docker-compose -f docker-compose.yml -f docker-compose.cron.yml up -d
+
+# Configure cron schedule (optional)
+echo "CRON_SCHEDULE=0 2 * * *" >> .env      # Daily at 2 AM
+echo "INGESTION_MODE=full" >> .env          # Full ingestion mode
+```
+
+#### Option 2: System Cron Jobs
+```bash
+# Make setup script executable
+chmod +x setup_cron.sh
+
+# Install daily ingestion at 2 AM
+./setup_cron.sh --install-daily
+
+# Or install custom schedule
+./setup_cron.sh --install-custom "0 */4 * * *"  # Every 4 hours
+
+# Check status
+./setup_cron.sh --status
+
+# Remove cron jobs
+./setup_cron.sh --remove
+```
+
+#### Cron Schedule Examples
+```bash
+# Daily full ingestion
+CRON_SCHEDULE="0 2 * * *"        # Every day at 2 AM
+
+# Test ingestion every 4 hours  
+CRON_SCHEDULE="0 */4 * * *"      # Every 4 hours
+
+# Weekly deep analysis
+CRON_SCHEDULE="0 1 * * 0"        # Sundays at 1 AM
+
+# Twice daily
+CRON_SCHEDULE="0 2,14 * * *"     # 2 AM and 2 PM daily
+```
+
+#### Monitoring Cron Jobs
+```bash
+# Check cron job health
+python3 scripts/monitor_cron.py --generate-report
+
+# Check last run
+python3 scripts/monitor_cron.py --check-last-run
+
+# Analyze recent logs
+python3 scripts/monitor_cron.py --check-logs --hours=24
+```
+
 ## 📖 Usage
+
+### Manual Data Ingestion
 
 1. **Install dependencies**
    ```bash

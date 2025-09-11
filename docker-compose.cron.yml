@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Existing services
+  api:
+    build: .
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    env_file:
+      - .env
+
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=workflows
+
+  # New cron service for automated ingestion
+  cron-ingestion:
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      - CRON_SCHEDULE=${CRON_SCHEDULE:-0 2 * * *}  # Default: daily at 2 AM
+      - INGESTION_MODE=${INGESTION_MODE:-full}      # Default: full ingestion
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
