@@ -6,16 +6,14 @@ A comprehensive data ingestion and analysis platform that tracks workflow popula
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Installation](#installation)
-- [Usage](#usage)
-- [API Documentation](#api-documentation)
-- [Data Sources](#data-sources)
-- [Configuration](#configuration)
-- [Development](#development)
-- [Contributing](#contributing)
+- [Overview](#-overview)
+- [Architecture](#️-architecture)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [API Documentation](#-api-documentation)
+- [Data Sources](#️-data-sources)
+- [Development](#-development)
+- [Links](#-links)
 
 ## 🌟 Overview
 
