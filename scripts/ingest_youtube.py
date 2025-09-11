@@ -17,7 +17,7 @@ def load_keywords_from_file(keywords_file="keywords.txt"):
         print(f"Warning: Keywords file '{keywords_path}' not found. Using default keywords.")
         return ["n8n workflow", "n8n automation tutorial", "n8n slack"]
 
-def fetch_youtube_workflows(keywords=None):
+def fetch_youtube_workflows(keywords=None, max_pages_per_keyword=None):
     if keywords is None:
         keywords = load_keywords_from_file()
     
@@ -38,7 +38,7 @@ def fetch_youtube_workflows(keywords=None):
             print(f"  -> Searching for keyword: '{keyword}'")
             next_page_token = None
             pages_processed = 0
-            max_pages = 5  # Limit to avoid quota exhaustion
+            max_pages = max_pages_per_keyword if max_pages_per_keyword else 10  # Use parameter or default to 10
             
             while pages_processed < max_pages:
                 search_request = youtube.search().list(

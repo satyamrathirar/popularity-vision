@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import insert
 from api.models import SessionLocal, Workflow, Base, engine
 from scripts.ingest_discourse import fetch_discourse_workflows
 from scripts.ingest_youtube import fetch_youtube_workflows
-from scripts.ingest_google import fetch_google_trends
+# from scripts.ingest_google import fetch_google_trends  # Disabled - API not working
 
 def upsert_workflows(db_session, workflow_data):
     if not workflow_data:
@@ -41,7 +41,7 @@ def upsert_workflows(db_session, workflow_data):
     )
     db_session.execute(update_stmt)
     db_session.commit()
-    print(f"Upserted {len(workflow_data)} records into the database.")
+    print(f"Upserted {len(unique_workflows)} records into the database.")
 
 def main():
     # This ensures the table exists before we try to insert data
@@ -49,39 +49,52 @@ def main():
     db = SessionLocal()
     
     all_workflows = []
+    target_workflows = 200
     
-    # Full ingestion from all sources for 20k+ workflows target
-    print("Starting full ingestion from all sources...")
-    print("Target: ~20,000 workflows total")
-    print("Estimated breakdown:")
-    print("  - Discourse: ~8,000 workflows (28 keywords × 10 pages × ~30 topics)")
-    print("  - YouTube: ~7,000 workflows (28 keywords × 10 pages × ~25 videos)")
-    print("  - Google Trends: ~60 trends (28 keywords × 2 countries)")
-    print("Expected runtime: 45-90 minutes\n")
+    print("=== TESTING INGESTION: 200 WORKFLOWS TARGET ===")
+    print("Distribution: ~100 Discourse + ~100 YouTube (Google Trends disabled)\n")
     
-    print("\n=== PHASE 1: Discourse Ingestion ===")
-    discourse_workflows = fetch_discourse_workflows()  # No keyword limit
+    # Phase 1: Discourse - Target ~100 workflows (limited keywords and pages)
+    print("=== PHASE 1: Discourse Ingestion ===")
+    print("Target: ~100 workflows")
+    discourse_workflows = fetch_discourse_workflows(max_keywords=3, max_pages_per_keyword=2)  # 3 keywords, 2 pages each
     print(f"Discourse collected: {len(discourse_workflows)} workflows")
     all_workflows.extend(discourse_workflows)
     
-    print("\n=== PHASE 2: YouTube Ingestion ===")
-    youtube_workflows = fetch_youtube_workflows()  # No keyword limit
+    # Phase 2: YouTube - Target ~100 workflows (limited keywords and pages)
+    print(f"\n=== PHASE 2: YouTube Ingestion ===")
+    print("Target: ~100 workflows")
+    # Load first 3 keywords manually for YouTube
+    from scripts.ingest_discourse import load_keywords_from_file
+    limited_keywords = load_keywords_from_file()[:3]
+    youtube_workflows = fetch_youtube_workflows(keywords=limited_keywords, max_pages_per_keyword=2)  # 3 keywords, 2 pages each
     print(f"YouTube collected: {len(youtube_workflows)} workflows")
     all_workflows.extend(youtube_workflows)
     
-    print("\n=== PHASE 3: Google Trends Ingestion ===")
-    google_workflows = fetch_google_trends()  # No keyword limit
-    print(f"Google Trends collected: {len(google_workflows)} workflows")
-    all_workflows.extend(google_workflows)
+    # Phase 3: Google Trends - DISABLED
+    print(f"\n=== PHASE 3: Google Trends Ingestion ===")
+    print("SKIPPED: Google Trends API currently disabled due to issues")
+    print("Google Trends collected: 0 workflows")
 
-    print(f"\n=== SUMMARY ===")
-    print(f"Total workflows collected: {len(all_workflows)}")
-    print(f"Target achieved: {'✓' if len(all_workflows) >= 20000 else '✗'} ({len(all_workflows)}/20,000)")
+    print(f"\n=== TESTING SUMMARY ===")
+    print(f"Target workflows: {target_workflows}")
+    print(f"Actual collected: {len(all_workflows)}")
+    print(f"Target achieved: {'✓' if len(all_workflows) >= target_workflows else '✗'} ({len(all_workflows)}/{target_workflows})")
+    
+    # Platform breakdown
+    discourse_count = len([w for w in all_workflows if w['platform'] == 'Discourse'])
+    youtube_count = len([w for w in all_workflows if w['platform'] == 'YouTube'])
+    google_count = 0  # Disabled
+    
+    print(f"\nPlatform Breakdown:")
+    print(f"  - Discourse: {discourse_count} workflows")
+    print(f"  - YouTube: {youtube_count} workflows") 
+    print(f"  - Google Trends: {google_count} trends (disabled)")
     
     upsert_workflows(db, all_workflows)
     
     db.close()
-    print("Full ingestion process finished.")
+    print("\nTest ingestion process finished successfully!")
 
 if __name__ == "__main__":
     main()

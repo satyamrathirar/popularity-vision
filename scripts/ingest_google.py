@@ -57,10 +57,15 @@ def calculate_trend_direction(df, keyword, days=30):
 
 def fetch_google_trends(
     keywords=None, 
-    countries=['US', 'IN']
+    countries=['US', 'IN'],
+    max_keywords=None
 ):
     if keywords is None:
         keywords = load_keywords_from_file()
+    
+    # Apply keyword limit if specified
+    if max_keywords is not None:
+        keywords = keywords[:max_keywords]
     
     print("Fetching data from Google Trends...")
     print(f"Using {len(keywords)} keywords from external file")

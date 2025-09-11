@@ -16,9 +16,14 @@ def load_keywords_from_file(keywords_file="keywords.txt"):
         print(f"Warning: Keywords file '{keywords_path}' not found. Using default keywords.")
         return ["workflow", "automation", "n8n"]
 
-def fetch_discourse_workflows(keywords=None):
+def fetch_discourse_workflows(keywords=None, max_keywords=None, max_pages_per_keyword=None):
     if keywords is None:
         keywords = load_keywords_from_file()
+    
+    # Limit keywords if specified
+    if max_keywords and max_keywords < len(keywords):
+        keywords = keywords[:max_keywords]
+        print(f"Limited to first {max_keywords} keywords for testing")
     
     print("Fetching data from n8n Discourse forum...")
     print(f"Using {len(keywords)} keywords from external file")
@@ -26,16 +31,17 @@ def fetch_discourse_workflows(keywords=None):
     workflows = []
     seen_urls = set()
  
-    for keyword in keywords:
-        print(f"  -> Searching for keyword: '{keyword}'")
+    for keyword_index, keyword in enumerate(keywords, 1):
+        print(f"[{keyword_index}/{len(keywords)}] -> Searching for keyword: '{keyword}'")
         page = 0
-        max_pages = 5  # Limit to avoid overwhelming the server
+        # Use custom max_pages if provided, otherwise default to full collection
+        max_pages = max_pages_per_keyword if max_pages_per_keyword else 10
         total_topics_for_keyword = 0
         
         try:
             while page < max_pages:
                 search_url = f"{base_url}/search.json?q={keyword}&page={page}"
-                search_res = requests.get(search_url)
+                search_res = requests.get(search_url, timeout=15)  # Add timeout for search requests
                 search_res.raise_for_status()
                 search_data = search_res.json()
 
@@ -58,7 +64,8 @@ def fetch_discourse_workflows(keywords=None):
 
                         print(f"      -> Processing topic {i+1}/{len(topics)}: '{topic['title']}' (ID: {topic_id})")
 
-                        topic_res = requests.get(topic_url)
+                        # Add timeout to prevent hanging
+                        topic_res = requests.get(topic_url, timeout=10)
                         topic_res.raise_for_status()
                         topic_data = topic_res.json()
 
@@ -67,6 +74,11 @@ def fetch_discourse_workflows(keywords=None):
                         replies = topic_data.get('reply_count', 0)
                         likes = topic_data.get('like_count', 0)
                         contributors = len(topic_data.get('details', {}).get('participants', []))
+                        
+                        # Skip topics with no engagement to speed up processing
+                        if views == 0 and replies == 0 and likes == 0:
+                            print(f"        -> Skipping topic with no engagement")
+                            continue
                         
                         # Calculate engagement ratios (similar to YouTube)
                         reply_to_view_ratio = round(replies / views, 6) if views > 0 else 0
@@ -98,17 +110,23 @@ def fetch_discourse_workflows(keywords=None):
                             "source_url": f"{base_url}/t/{topic_id}"
                         })
                         
-                        time.sleep(0.1) 
+                        # Reduce delay since we added timeout
+                        time.sleep(0.05)  # Reduced from 0.1
 
+                    except requests.exceptions.Timeout:
+                        print(f"      -> TIMEOUT: Topic ID {topic_id} took too long to respond, skipping...")
                     except requests.exceptions.RequestException as e:
                         print(f"      -> WARN: Could not fetch details for topic ID {topic_id}. Reason: {e}")
                     except KeyError as e:
                         print(f"      -> WARN: Could not parse details for topic ID {topic_id}. Missing key: {e}")
+                    except Exception as e:
+                        print(f"      -> ERROR: Unexpected error for topic ID {topic_id}: {e}")
                 
                 page += 1
-                time.sleep(0.5)  # Small delay between pages to be respectful
+                # Reduce page delay since we're being more efficient
+                time.sleep(0.2)  # Reduced from 0.5
             
-            print(f"  -> Total topics processed for '{keyword}': {total_topics_for_keyword}")
+            print(f"  -> Completed '{keyword}': {total_topics_for_keyword} topics processed, {len([w for w in workflows if keyword.lower() in w['workflow_name'].lower()])} workflows added")
 
         except requests.exceptions.RequestException as e:
             print(f"ERROR: Could not perform search for keyword '{keyword}'. Reason: {e}")

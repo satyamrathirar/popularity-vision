@@ -1,12 +1,66 @@
 import sys
 sys.path.append('.')
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
+from datetime import datetime
 from api import models
 
 app = FastAPI(title="n8n Workflow Popularity API")
+
+# Pydantic response models for better structure
+class WorkflowSummary(BaseModel):
+    id: int
+    workflow_name: str
+    platform: str
+    country: str
+    source_url: Optional[str] = None
+    last_updated: datetime
+    key_metrics: Dict[str, Any]  # Top 3-4 most important metrics per platform
+    
+    class Config:
+        from_attributes = True
+
+class WorkflowDetailed(BaseModel):
+    id: int
+    workflow_name: str
+    platform: str
+    country: str
+    popularity_metrics: Dict[str, Any]
+    source_url: Optional[str] = None
+    last_updated: datetime
+    
+    class Config:
+        from_attributes = True
+
+def extract_key_metrics(platform: str, metrics: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract key metrics based on platform for summary view"""
+    if platform == "YouTube":
+        return {
+            "views": metrics.get("views", 0),
+            "engagement_score": metrics.get("engagement_score", 0),
+            "like_to_view_ratio": metrics.get("like_to_view_ratio", 0),
+            "comments": metrics.get("comments", 0)
+        }
+    elif platform == "Discourse":
+        return {
+            "views": metrics.get("views", 0),
+            "replies": metrics.get("replies", 0),
+            "engagement_score": metrics.get("engagement_score", 0),
+            "contributors": metrics.get("contributors", 0)
+        }
+    elif platform == "Google Trends":
+        return {
+            "relative_search_interest": metrics.get("relative_search_interest", 0),
+            "momentum_score": metrics.get("momentum_score", 0),
+            "trend_30d_direction": metrics.get("trend_30d", {}).get("trend_direction", "unknown"),
+            "trend_30d_change": metrics.get("trend_30d", {}).get("change_percentage", 0)
+        }
+    else:
+        # Fallback for unknown platforms
+        return {k: v for k, v in list(metrics.items())[:4]}
 
 # Dependency to get DB session
 def get_db():
@@ -16,8 +70,14 @@ def get_db():
     finally:
         db.close()
 
-@app.get("/workflows")
-def get_workflows(platform: Optional[str] = None, country: Optional[str] = None, db: Session = Depends(get_db)):
+@app.get("/workflows", response_model=List[WorkflowSummary])
+def get_workflows(
+    platform: Optional[str] = None, 
+    country: Optional[str] = None, 
+    view: str = Query("summary", description="View type: 'summary' or 'detailed'"),
+    db: Session = Depends(get_db)
+):
+    """Get workflows with platform prominently displayed in collapsed view"""
     query = db.query(models.Workflow)
     if platform:
         query = query.filter(models.Workflow.platform == platform)
@@ -28,7 +88,48 @@ def get_workflows(platform: Optional[str] = None, country: Optional[str] = None,
     if not results:
         raise HTTPException(status_code=404, detail="No workflows found for the given criteria")
 
-    return results
+    # Convert to summary format with key metrics
+    summary_results = []
+    for workflow in results:
+        key_metrics = extract_key_metrics(workflow.platform, workflow.popularity_metrics)
+        summary_results.append(WorkflowSummary(
+            id=workflow.id,
+            workflow_name=workflow.workflow_name,
+            platform=workflow.platform,
+            country=workflow.country,
+            source_url=workflow.source_url,
+            last_updated=workflow.last_updated,
+            key_metrics=key_metrics
+        ))
+
+    return summary_results
+
+@app.get("/workflows/detailed", response_model=List[WorkflowDetailed])
+def get_workflows_detailed(
+    platform: Optional[str] = None, 
+    country: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get workflows with full detailed metrics"""
+    query = db.query(models.Workflow)
+    if platform:
+        query = query.filter(models.Workflow.platform == platform)
+    if country:
+        query = query.filter(models.Workflow.country == country)
+
+    results = query.all()
+    if not results:
+        raise HTTPException(status_code=404, detail="No workflows found for the given criteria")
+
+    return [WorkflowDetailed(
+        id=workflow.id,
+        workflow_name=workflow.workflow_name,
+        platform=workflow.platform,
+        country=workflow.country,
+        popularity_metrics=workflow.popularity_metrics,
+        source_url=workflow.source_url,
+        last_updated=workflow.last_updated
+    ) for workflow in results]
 
 @app.get("/workflows/engagement")
 def get_workflows_with_engagement(
