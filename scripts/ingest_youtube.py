@@ -50,7 +50,11 @@ def fetch_youtube_workflows(keywords=None, max_pages_per_keyword=None):
                 )
                 search_response = search_request.execute()
                 
-                page_video_ids = [item['id']['videoId'] for item in search_response.get('items', [])]
+                # Safely extract video IDs, handle cases where 'videoId' might not exist
+                page_video_ids = []
+                for item in search_response.get('items', []):
+                    if 'id' in item and 'videoId' in item['id']:
+                        page_video_ids.append(item['id']['videoId'])
                 all_video_ids.extend(page_video_ids)
                 
                 pages_processed += 1
